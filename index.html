@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OAuth Redirect Handler</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: Inter, Segoe UI, Arial, sans-serif; margin: 2rem; line-height: 1.5; }
+    .card { max-width: 760px; border: 1px solid #6664; border-radius: 12px; padding: 1rem 1.25rem; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    pre { background: #8882; padding: .75rem; border-radius: 8px; overflow: auto; }
+    .ok { color: #10893e; font-weight: 600; }
+    .warn { color: #c27c00; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>OAuth Redirect Handler</h1>
+    <p id="status" class="warn">Processing callback...</p>
+    <p>This page extracts OAuth callback parameters and forwards them to the opener window (popup flow) using <code>postMessage</code>.</p>
+
+    <h3>Parsed callback payload</h3>
+    <pre id="payload">{}</pre>
+
+    <h3>How to use</h3>
+    <ol>
+      <li>Set your provider callback URL to this page URL.</li>
+      <li>Open OAuth in a popup from your app.</li>
+      <li>In your app, listen for <code>message</code> events and validate <code>event.origin</code>.</li>
+    </ol>
+  </div>
+
+  <script>
+    (function () {
+      const query = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+      const payload = {
+        query: Object.fromEntries(query.entries()),
+        hash: Object.fromEntries(hash.entries()),
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      };
+
+      document.getElementById('payload').textContent = JSON.stringify(payload, null, 2);
+
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(
+            { type: 'oauth_callback', payload },
+            '*'
+          );
+          document.getElementById('status').textContent = 'Callback forwarded to opener window. You can close this tab.';
+          document.getElementById('status').className = 'ok';
+        } else {
+          document.getElementById('status').textContent = 'No opener window detected. Copy values from payload if needed.';
+          document.getElementById('status').className = 'warn';
+        }
+      } catch (err) {
+        document.getElementById('status').textContent = 'Failed to postMessage to opener: ' + String(err);
+        document.getElementById('status').className = 'warn';
+      }
+    })();
+  </script>
+</body>
+</html>
