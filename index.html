@@ -12,6 +12,19 @@
     pre { background: #8882; padding: .75rem; border-radius: 8px; overflow: auto; }
     .ok { color: #10893e; font-weight: 600; }
     .warn { color: #c27c00; font-weight: 600; }
+    .actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: .75rem 0 1rem; }
+    button {
+      appearance: none;
+      border: 1px solid #6666;
+      border-radius: 10px;
+      padding: .65rem .9rem;
+      font: inherit;
+      cursor: pointer;
+      background: #f3f3f3;
+      color: inherit;
+    }
+    button:hover { filter: brightness(0.97); }
+    button:active { transform: translateY(1px); }
   </style>
 </head>
 <body>
@@ -21,6 +34,10 @@
     <p>This page extracts OAuth callback parameters and forwards them to the opener window (popup flow) using <code>postMessage</code>.</p>
 
     <h3>Parsed callback payload</h3>
+    <div class="actions">
+      <button id="copyUrlBtn" type="button">Copy callback URL</button>
+      <button id="copyPayloadBtn" type="button">Copy payload JSON</button>
+    </div>
     <pre id="payload">{}</pre>
 
     <h3>How to use</h3>
@@ -35,7 +52,6 @@
     (function () {
       const query = new URLSearchParams(window.location.search);
       const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-
       const payload = {
         query: Object.fromEntries(query.entries()),
         hash: Object.fromEntries(hash.entries()),
@@ -43,7 +59,59 @@
         timestamp: new Date().toISOString()
       };
 
-      document.getElementById('payload').textContent = JSON.stringify(payload, null, 2);
+      const statusEl = document.getElementById('status');
+      const payloadEl = document.getElementById('payload');
+      const copyUrlBtn = document.getElementById('copyUrlBtn');
+      const copyPayloadBtn = document.getElementById('copyPayloadBtn');
+      const payloadJson = JSON.stringify(payload, null, 2);
+
+      payloadEl.textContent = payloadJson;
+
+      async function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'absolute';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        if (!success) {
+          throw new Error('Clipboard copy failed');
+        }
+      }
+
+      function setCopiedMessage(label) {
+        statusEl.textContent = label;
+        statusEl.className = 'ok';
+      }
+
+      copyUrlBtn.addEventListener('click', async () => {
+        try {
+          await copyText(window.location.href);
+          setCopiedMessage('Callback URL copied to clipboard.');
+        } catch (err) {
+          statusEl.textContent = 'Failed to copy callback URL: ' + String(err);
+          statusEl.className = 'warn';
+        }
+      });
+
+      copyPayloadBtn.addEventListener('click', async () => {
+        try {
+          await copyText(payloadJson);
+          setCopiedMessage('Payload JSON copied to clipboard.');
+        } catch (err) {
+          statusEl.textContent = 'Failed to copy payload JSON: ' + String(err);
+          statusEl.className = 'warn';
+        }
+      });
 
       try {
         if (window.opener && !window.opener.closed) {
@@ -51,15 +119,15 @@
             { type: 'oauth_callback', payload },
             '*'
           );
-          document.getElementById('status').textContent = 'Callback forwarded to opener window. You can close this tab.';
-          document.getElementById('status').className = 'ok';
+          statusEl.textContent = 'Callback forwarded to opener window. You can close this tab.';
+          statusEl.className = 'ok';
         } else {
-          document.getElementById('status').textContent = 'No opener window detected. Copy values from payload if needed.';
-          document.getElementById('status').className = 'warn';
+          statusEl.textContent = 'No opener window detected. Copy values from payload if needed.';
+          statusEl.className = 'warn';
         }
       } catch (err) {
-        document.getElementById('status').textContent = 'Failed to postMessage to opener: ' + String(err);
-        document.getElementById('status').className = 'warn';
+        statusEl.textContent = 'Failed to postMessage to opener: ' + String(err);
+        statusEl.className = 'warn';
       }
     })();
   </script>
